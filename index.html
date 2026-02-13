@@ -15,6 +15,7 @@
         .btn-gray { background-color: #333; color: white; border: 1px solid #444; }
         .btn-green { background-color: #22c55e; color: black; box-shadow: 0 4px 15px rgba(34, 197, 94, 0.3); }
         .btn-blue { background-color: #2563eb; color: white; border-top: 1px solid #60a5fa; }
+        .btn-orange { background-color: #f97316; color: white; border-top: 1px solid #fdba74; }
         .card { background: #1c1c1c; padding: 20px; border-radius: 16px; margin-bottom: 20px; border: 1px solid #333; }
         
         /* Barras de Progreso */
@@ -119,15 +120,23 @@
         <button onclick="borrarTodo()" class="text-xs text-red-500 hover:text-red-400 transition-colors">🗑️ Borrar Todo</button>
     </div>
     
-    <div id="listaHistorial" class="pb-4 space-y-3">
-        </div>
+    <div id="listaHistorial" class="pb-4 space-y-3"></div>
     
-    <button onclick="exportarExcel()" class="btn btn-blue mt-6 mb-10 flex items-center justify-center gap-2 shadow-lg shadow-blue-900/50">
-        📄 Descargar Reporte Financiero
-    </button>
+    <div class="grid grid-cols-1 gap-3 mt-6 mb-10">
+        <button onclick="exportarExcel()" class="btn btn-blue flex items-center justify-center gap-2 shadow-lg">
+            📄 Guardar Copia (Descargar)
+        </button>
+        
+        <label class="btn btn-orange flex items-center justify-center gap-2 shadow-lg cursor-pointer">
+            🔄 Restaurar Copia (Subir Archivo)
+            <input type="file" id="fileImport" class="hidden" accept=".csv" onchange="importarExcel(event)">
+        </label>
+        <p class="text-[10px] text-gray-500 text-center uppercase tracking-tighter">Respalda siempre después de cada trabajo importante</p>
+    </div>
 
     <script>
         const META_ARRIENDO = 2500000;
+        // Llave de datos consistente
         let trabajos = JSON.parse(localStorage.getItem('metalApp_v8_trabajos')) || []; 
 
         function setDias(n) {
@@ -262,67 +271,72 @@
             }
         }
 
-        // --- EXPORTAR EXCEL MEJORADO ---
+        // --- EXPORTAR EXCEL ---
         function exportarExcel() {
             if(trabajos.length === 0) return alert("No hay datos para exportar aún.");
-
-            // 1. Encabezados (Usamos ; para Excel en español)
-            let csvContent = "\uFEFF"; 
-            csvContent += "Fecha;Trabajo;Costo Material;Mi Sueldo (Mano de Obra);Ganancia Negocio (Arriendo/Ahorro);Precio Cobrado al Cliente\n";
-
-            // Variables para sumar todo
-            let sumMat = 0;
-            let sumSueldo = 0;
-            let sumGanancia = 0;
-            let sumPrecio = 0;
-
+            let csvContent = "\uFEFFFecha;Trabajo;Material;Sueldo;Ganancia;Total\n";
             trabajos.forEach(t => {
-                // Sumamos
-                sumMat += (t.material || 0);
-                sumSueldo += (t.sueldo || 0);
-                sumGanancia += (t.ganancia || 0);
-                sumPrecio += (t.precio || 0);
-
-                let fila = [
-                    t.fecha,
-                    t.desc.replace(/;/g, " "), // Quitar ; de la descripción para no dañar el formato
-                    t.material,
-                    t.sueldo,
-                    t.ganancia,
-                    t.precio
-                ].join(";");
-                csvContent += fila + "\n";
+                csvContent += `${t.fecha};${t.desc};${t.material};${t.sueldo};${t.ganancia};${t.precio}\n`;
             });
-
-            // 2. AGREGAR FILA DE TOTALES
-            csvContent += "\n"; // Salto de linea
-            csvContent += `TOTALES ACUMULADOS;---;${sumMat};${sumSueldo};${sumGanancia};${sumPrecio}\n`;
-
-            // 3. Generar Descarga
             const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
             const url = URL.createObjectURL(blob);
             const link = document.createElement("a");
-            link.setAttribute("href", url);
-            
-            // Nombre profesional con fecha
-            const fechaHoy = new Date().toLocaleDateString('es-CO').replace(/\//g, '-');
-            link.setAttribute("download", `Reporte Financiero ${fechaHoy}.csv`);
-            
-            document.body.appendChild(link);
+            link.href = url;
+            link.download = `RESPALDO_ACERO_${new Date().toLocaleDateString().replace(/\//g,'-')}.csv`;
             link.click();
-            document.body.removeChild(link);
+        }
+
+        // --- IMPORTAR (PLAN DE CONTINGENCIA) ---
+        function importarExcel(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const content = e.target.result;
+                const lines = content.split("\n");
+                let nuevosTrabajos = [];
+
+                for (let i = 1; i < lines.length; i++) {
+                    const cols = lines[i].split(";");
+                    if (cols.length >= 6) {
+                        nuevosTrabajos.push({
+                            id: Date.now() + i,
+                            fecha: cols[0].replace("\uFEFF", ""),
+                            desc: cols[1],
+                            material: parseFloat(cols[2]),
+                            sueldo: parseFloat(cols[3]),
+                            ganancia: parseFloat(cols[4]),
+                            precio: parseFloat(cols[5])
+                        });
+                    }
+                }
+
+                if (nuevosTrabajos.length > 0) {
+                    if (confirm(`Se encontraron ${nuevosTrabajos.length} trabajos. ¿Quieres reemplazar tu historial actual con esta copia?`)) {
+                        trabajos = nuevosTrabajos;
+                        localStorage.setItem('metalApp_v8_trabajos', JSON.stringify(trabajos));
+                        actualizarUI();
+                        alert("✅ Historial restaurado con éxito.");
+                    }
+                } else {
+                    alert("❌ El archivo no parece ser una copia de seguridad válida.");
+                }
+            };
+            reader.readAsText(file);
         }
 
         function borrarTodo() {
-            if(confirm("¿Estás seguro? Se borrará todo el historial y las barras vuelven a cero.")) {
-                localStorage.removeItem('metalApp_v8_trabajos');
-                trabajos = [];
-                actualizarUI();
+            if(confirm("¿Estás seguro de borrar TODO el historial?")) {
+                if(confirm("⚠️ AVISO: Perderás todos los datos si no tienes una copia guardada. ¿Confirmas el borrado definitivo?")) {
+                    localStorage.removeItem('metalApp_v8_trabajos');
+                    trabajos = [];
+                    actualizarUI();
+                }
             }
         }
 
         // Init
-        calcular();
         actualizarUI();
     </script>
 </body>
