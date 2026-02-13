@@ -41,7 +41,7 @@
                 <div id="barraArriendo" class="progress-bar bar-rent" style="width: 0%">Falta</div>
             </div>
             <div class="flex justify-between text-sm mb-1">
-                <span class="text-yellow-500">💰 Ganancia Extra</span>
+                <span>💰 Ganancia Extra</span>
                 <span id="txtProfitTotal" class="text-yellow-400 font-bold">$0</span>
             </div>
             <div class="progress-container border border-yellow-900/50 bg-gray-900 mb-6">
@@ -128,6 +128,7 @@
 
             document.getElementById('lblMultiplicador').innerText = Math.round((multiplicador - 1) * 100) + "%";
             document.getElementById('txtPrecioFinal').innerText = formatoDinero(precioVenta);
+            
             document.getElementById('miniMaterial').innerText = formatoDinero(material);
             document.getElementById('miniSueldo').innerText = formatoDinero(sueldo);
             document.getElementById('miniGanancia').innerText = formatoDinero(gananciaNegocio);
@@ -187,6 +188,21 @@
             calcular();
         }
 
+        // NUEVA FUNCIÓN PARA ELIMINAR TRABAJO INDIVIDUAL
+        function eliminarTrabajo(id) {
+            if(confirm("¿Estás seguro de eliminar este trabajo específico?")) {
+                trabajos = trabajos.filter(t => t.id !== id);
+                localStorage.setItem('metalApp_v8_trabajos', JSON.stringify(trabajos));
+                
+                // Si estamos editando el trabajo que se eliminó, cancelamos la edición
+                if (editandoId === id) {
+                    cancelarEdicion();
+                }
+                
+                actualizarUI();
+            }
+        }
+
         function actualizarUI() {
             const lista = document.getElementById('listaHistorial');
             lista.innerHTML = trabajos.length === 0 ? '<div class="text-center text-gray-600 py-10 italic text-sm">Sin registros</div>' : '';
@@ -195,7 +211,10 @@
                 totalGanancia += t.ganancia; totalSueldo += (t.sueldo || 0);
                 lista.innerHTML += `
                     <div class="bg-gray-800 p-4 rounded-xl border border-gray-700 shadow-lg relative">
-                        <button onclick="editarTrabajo(${t.id})" class="absolute top-4 right-4 text-yellow-500 text-xs border border-yellow-900 px-2 py-1 rounded">Editar</button>
+                        <div class="absolute top-4 right-4 flex gap-2">
+                            <button onclick="eliminarTrabajo(${t.id})" class="text-red-500 text-xs border border-red-900 px-2 py-1 rounded">Eliminar</button>
+                            <button onclick="editarTrabajo(${t.id})" class="text-yellow-500 text-xs border border-yellow-900 px-2 py-1 rounded">Editar</button>
+                        </div>
                         <div class="flex justify-between items-start mb-3">
                             <div>
                                 <div class="text-2xl font-bold text-white tracking-tight">${formatoDinero(t.precio)}</div>
@@ -247,7 +266,6 @@
                 }
                 
                 if (nuevos.length > 0) {
-                    // --- DOBLE CONFIRMACIÓN DE SEGURIDAD ---
                     const msn1 = `Se encontraron ${nuevos.length} registros en el archivo. ¿Quieres cargarlos?`;
                     const msn2 = `⚠️ ¡CUIDADO! Tienes datos actuales en la App que se BORRARÁN para siempre. ¿Estás SEGURO de que quieres reemplazarlos con el archivo de respaldo?`;
                     
@@ -264,7 +282,7 @@
                 }
             };
             reader.readAsText(file);
-            event.target.value = ''; // Limpiar input
+            event.target.value = ''; 
         }
 
         function borrarTodo() {
